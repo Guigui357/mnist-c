@@ -54,7 +54,7 @@ jobs:
         echo "✅ Headless training loop executed successfully."
 
     - name: Archive Model Weights Binary as Build Artifact
-      uses: actions/actions-artifact@v4
+      uses: actions/upload-artifact@v4
       with:
         name: trained-model-weights
         path: nova_pesos.bin
