@@ -61,7 +61,7 @@ jobs:
         retention-days: 14
 
     - name: Archive Extracted PGM Samples as Build Artifact
-      uses: actions/actions-artifact@v4
+      uses: actions/upload-artifact@v4
       with:
         name: extracted-mnist-pgm-samples
         path: data/
