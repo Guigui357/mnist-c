@@ -1,13 +1,13 @@
-name: NOVA CI Engine Validation
+name: NOVA CI Engine Validation & Artifact Deployment
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, dev ]
   pull_request:
     branches: [ main, master ]
 
 jobs:
-  build-and-validate:
+  build-train-artifact:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,20 +17,52 @@ jobs:
     - name: Set up Build Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential gcc
+        sudo apt-get install -y build-essential gcc wget curl
 
-    - name: Verify Structural Source File
+    - name: Create Workspace Drop Zones
       run: |
-        if [ ! -f "code.c" ]; then
-          echo "❌ Critical Error: code.c core source file not found in root context."
-          exit 1
+        mkdir -p tmp
+        mkdir -p data
+
+    - name: Fetch Remote Dataset Assets (CI Mode)
+      run: |
+        echo "🌐 Downloading raw compressed MNIST vectors..."
+        BASE_URL="https://ossci-datasets.s3.amazonaws.com/mnist/"
+        wget -q "${BASE_URL}train-images-idx3-ubyte.gz" -O tmp/train-images-idx3-ubyte.gz
+        wget -q "${BASE_URL}train-labels-idx1-ubyte.gz" -O tmp/train-labels-idx1-ubyte.gz
+        wget -q "${BASE_URL}t10k-images-idx3-ubyte.gz" -O tmp/t10k-images-idx3-ubyte.gz
+        wget -q "${BASE_URL}t10k-labels-idx1-ubyte.gz" -O tmp/t10k-labels-idx1-ubyte.gz
+        echo "✅ Download complete."
+
+    - name: Run Dataset Extractor Pipeline
+      run: |
+        if [ -f "extract_local_mnist.py" ]; then
+          python3 extract_local_mnist.py
+        else
+          echo "❌ Missing dataset extractor module." && exit 1
         fi
 
-    - name: Test Production Build Under Strict Compiler Assertions
+    - name: Compile C Engine with Production Flags
       run: |
-        gcc -O3 -Wall -Wextra -std=c99 main.c -o ai -lm
+        gcc -O3 -Wall -Wextra -std=c99 code.c -o ai -lm
 
-    - name: System Environment Integrity Check
+    - name: Execute Live Training Pipeline (Headless Run)
       run: |
-        ./ai --help || true
-        echo "✅ CI Binary static footprint verification completed successfully."
+        echo "🧠 Training the network headlessly inside the CI environment..."
+        # We pass an empty echo to satisfy the interative mode block loop so it shuts down cleanly after training
+        echo "quit" | ./ai
+        echo "✅ Headless training loop executed successfully."
+
+    - name: Archive Model Weights Binary as Build Artifact
+      uses: actions/actions-artifact@v4
+      with:
+        name: trained-model-weights
+        path: nova_pesos.bin
+        retention-days: 14
+
+    - name: Archive Extracted PGM Samples as Build Artifact
+      uses: actions/actions-artifact@v4
+      with:
+        name: extracted-mnist-pgm-samples
+        path: data/
+        retention-days: 5
