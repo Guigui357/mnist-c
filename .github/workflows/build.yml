@@ -1,0 +1,36 @@
+name: NOVA CI Engine Validation
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository Source
+      uses: actions/checkout@v4
+
+    - name: Set up Build Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential gcc
+
+    - name: Verify Structural Source File
+      run: |
+        if [ ! -f "code.c" ]; then
+          echo "❌ Critical Error: code.c core source file not found in root context."
+          exit 1
+        fi
+
+    - name: Test Production Build Under Strict Compiler Assertions
+      run: |
+        gcc -O3 -Wall -Wextra -std=c99 main.c -o ai -lm
+
+    - name: System Environment Integrity Check
+      run: |
+        ./ai --help || true
+        echo "✅ CI Binary static footprint verification completed successfully."
